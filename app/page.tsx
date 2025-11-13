@@ -11,6 +11,7 @@ import {
   ExternalLink,
   FileText,
   FileImage,
+  Maximize,
 } from "lucide-react";
 
 // Extensiones de imagen a probar (ordenadas por probabilidad de uso)
@@ -222,43 +223,40 @@ export default function VisualizadorPage() {
             {/* PDF Card */}
             <Card className="border-border bg-card shadow-sm transition-shadow hover:shadow-md">
               <div className="border-b border-border bg-muted/30 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-9 items-center justify-center rounded-md bg-primary/10">
-                    <FileText className="size-4 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Documento SSC
-                      </span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-9 items-center justify-center rounded-md bg-primary/10">
+                      <FileText className="size-4 text-primary" />
                     </div>
-                    <p className="mt-0.5 font-mono text-sm font-semibold text-foreground">
-                      {ssc}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="flex flex-col items-center justify-center gap-4 rounded-lg bg-muted/50 py-12">
-                  <div className="flex size-16 items-center justify-center rounded-full bg-background shadow-sm">
-                    <FileText className="size-8 text-muted-foreground" />
-                  </div>
-                  <div className="text-center">
-                    <h3 className="font-semibold text-foreground">
-                      Documento PDF
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Visualizar en navegador
-                    </p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Documento SSC
+                        </span>
+                      </div>
+                      <p className="mt-0.5 font-mono text-sm font-semibold text-foreground">
+                        {ssc}
+                      </p>
+                    </div>
                   </div>
                   <Button
                     onClick={() => window.open(getPdfUrl(ssc), "_blank")}
-                    size="lg"
-                    className="mt-2 gap-2 shadow-sm"
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
                   >
-                    <ExternalLink className="size-4" />
-                    Abrir Documento
+                    <Maximize className="size-4" />
+                    Pantalla completa
                   </Button>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="overflow-hidden rounded-lg border border-border bg-muted/50">
+                  <iframe
+                    src={getPdfUrl(ssc)}
+                    className="h-[600px] w-full"
+                    title={`PDF SSC ${ssc}`}
+                  />
                 </div>
               </div>
             </Card>
