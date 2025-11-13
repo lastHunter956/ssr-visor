@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -12,6 +13,10 @@ import {
   FileText,
   FileImage,
   Maximize,
+  ChevronLeft,
+  ChevronRight,
+  List,
+  Trash2,
 } from "lucide-react";
 
 // Extensiones de imagen a probar (ordenadas por probabilidad de uso)
@@ -41,6 +46,13 @@ const IMAGE_EXTENSIONS = [
   "TIF",
 ];
 
+// Interfaz para los registros precargados
+interface PreloadedRecord {
+  ssc: string;
+  guia: string;
+  index: number;
+}
+
 export default function VisualizadorPage() {
   const [inputValue, setInputValue] = useState("");
   const [ssc, setSsc] = useState("");
@@ -50,6 +62,13 @@ export default function VisualizadorPage() {
   const [imageError, setImageError] = useState(false);
   const [imageExtensionIndex, setImageExtensionIndex] = useState(0);
   const [showResults, setShowResults] = useState(false);
+
+  // Estados para precarga masiva
+  const [preloadedRecords, setPreloadedRecords] = useState<PreloadedRecord[]>(
+    []
+  );
+  const [currentRecordIndex, setCurrentRecordIndex] = useState(0);
+  const [isBulkMode, setIsBulkMode] = useState(false);
 
   // Función para buscar y dividir el input
   const handleSearch = () => {
@@ -63,6 +82,32 @@ export default function VisualizadorPage() {
     setImageExtensionIndex(0);
 
     const trimmedInput = inputValue.trim();
+
+    // Detectar si es entrada masiva (tiene múltiples líneas)
+    if (trimmedInput.includes("\n")) {
+      const records = parseBulkInput(trimmedInput);
+
+      if (records.length === 0) {
+        setError(
+          "No se encontraron registros válidos en el formato correcto. Use: SSC [TAB] GUIA por línea"
+        );
+        return;
+      }
+
+      // Activar modo bulk y cargar el primer registro
+      setPreloadedRecords(records);
+      setIsBulkMode(true);
+      setCurrentRecordIndex(0);
+      navigateToRecord(0);
+      return;
+    }
+
+    // Limpiar cache si no es bulk mode
+    if (isBulkMode) {
+      setPreloadedRecords([]);
+      setIsBulkMode(false);
+      setCurrentRecordIndex(0);
+    }
 
     const normalizedInput = trimmedInput.replace(/\s+/g, " ");
 
@@ -143,6 +188,75 @@ export default function VisualizadorPage() {
     return input;
   };
 
+  // Función para parsear entrada masiva
+  const parseBulkInput = (input: string): PreloadedRecord[] => {
+    const lines = input.split("\n").filter((line) => line.trim() !== "");
+    const records: PreloadedRecord[] = [];
+
+    lines.forEach((line, index) => {
+      const parts = line.trim().split(/\t+/); // Split por uno o más tabs
+      if (parts.length >= 2) {
+        const sscValue = parts[0].trim();
+        const guiaValue = formatGuiaIfNeeded(parts[1].trim());
+
+        // Validación básica
+        if (sscValue && guiaValue) {
+          records.push({
+            ssc: sscValue,
+            guia: guiaValue,
+            index: index,
+          });
+        }
+      }
+    });
+
+    return records;
+  };
+
+  // Navegación entre registros precargados
+  const navigateToRecord = (index: number) => {
+    if (index >= 0 && index < preloadedRecords.length) {
+      const record = preloadedRecords[index];
+      setCurrentRecordIndex(index);
+      setSsc(record.ssc);
+      setGuia(record.guia);
+      setInputValue(`${record.ssc} ${record.guia}`);
+
+      // Resetear estados de imagen
+      setImageExtensionIndex(0);
+      setImageError(false);
+      setShowResults(true);
+
+      // Construir URL de imagen
+      const baseUrl = `https://us-east-1.linodeobjects.com/codigoverde01-bucket/adjuntos/grupotuga/xx/CUMPLIDOS/`;
+      const imageUrl = `${baseUrl}${record.guia}/DC_${record.guia}.${IMAGE_EXTENSIONS[0]}`;
+      setCurrentImageUrl(imageUrl);
+    }
+  };
+
+  const navigateNext = () => {
+    if (currentRecordIndex < preloadedRecords.length - 1) {
+      navigateToRecord(currentRecordIndex + 1);
+    }
+  };
+
+  const navigatePrevious = () => {
+    if (currentRecordIndex > 0) {
+      navigateToRecord(currentRecordIndex - 1);
+    }
+  };
+
+  const clearCache = () => {
+    setPreloadedRecords([]);
+    setCurrentRecordIndex(0);
+    setIsBulkMode(false);
+    setInputValue("");
+    setSsc("");
+    setGuia("");
+    setShowResults(false);
+    setError("");
+  };
+
   // Generar URL del PDF
   const getPdfUrl = (sscValue: string) => {
     return `https://medicar.sis-colombia.com/pharmaser/mutualser/el_admin/comunes/plano_despacho_reimprimir_pdf.php?todos=1&id_formula=${sscValue}&id_punto=14`;
@@ -177,33 +291,56 @@ export default function VisualizadorPage() {
               Buscar Documento
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Ingresa el código SSC y el número de guía separados por un espacio
-              o tabulación. El sistema buscará automáticamente los documentos
-              asociados.
+              Ingresa el código SSC y el número de guía separados por un
+              espacio. Para búsqueda masiva, pega múltiples líneas con formato:
+              SSC [TAB] GUIA. El sistema precargará todos los registros y podrás
+              navegar entre ellos.
             </p>
           </div>
 
           <Card className="max-w-3xl border-border bg-card shadow-sm">
             <div className="p-6">
-              <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-col gap-3">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Ej: 3394535 335-17-20-CC-3589"
+                  <Search className="absolute left-3 top-3 size-4 text-muted-foreground" />
+                  <Textarea
+                    placeholder="Ej: 3394535 335-17-20-CC-3589&#10;&#10;O pega múltiples líneas:&#10;SSC [TAB] GUIA&#10;SSC [TAB] GUIA&#10;..."
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    className="h-11 pl-10 text-base"
+                    onKeyDown={(e) => {
+                      if (
+                        e.key === "Enter" &&
+                        !e.shiftKey &&
+                        !inputValue.includes("\n")
+                      ) {
+                        e.preventDefault();
+                        handleSearch();
+                      }
+                    }}
+                    className="min-h-[80px] pl-10 text-base resize-y"
                   />
                 </div>
-                <Button
-                  onClick={handleSearch}
-                  size="lg"
-                  className="h-11 sm:w-auto sm:px-8"
-                >
-                  Buscar
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSearch}
+                    size="lg"
+                    className="flex-1 h-11"
+                  >
+                    <Search className="size-4 mr-2" />
+                    Buscar
+                  </Button>
+                  {isBulkMode && (
+                    <Button
+                      onClick={clearCache}
+                      size="lg"
+                      variant="outline"
+                      className="h-11"
+                    >
+                      <Trash2 className="size-4 mr-2" />
+                      Limpiar Cache
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {error && (
@@ -213,6 +350,43 @@ export default function VisualizadorPage() {
                     {error}
                   </AlertDescription>
                 </Alert>
+              )}
+
+              {/* Barra de navegación para modo bulk */}
+              {isBulkMode && preloadedRecords.length > 0 && (
+                <div className="mt-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <List className="size-4 text-primary" />
+                      <span className="text-sm font-medium text-foreground">
+                        Navegando: {currentRecordIndex + 1} de{" "}
+                        {preloadedRecords.length}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={navigatePrevious}
+                        disabled={currentRecordIndex === 0}
+                        size="sm"
+                        variant="outline"
+                      >
+                        <ChevronLeft className="size-4 mr-1" />
+                        Anterior
+                      </Button>
+                      <Button
+                        onClick={navigateNext}
+                        disabled={
+                          currentRecordIndex === preloadedRecords.length - 1
+                        }
+                        size="sm"
+                        variant="outline"
+                      >
+                        Siguiente
+                        <ChevronRight className="size-4 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </Card>
